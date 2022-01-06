@@ -337,18 +337,15 @@ global.msw_directory = {};
 function requireMsw(mission_name, directory_name) {
     var require_msw_name = directory_name.replace(mission_name + '_', '');
 
-    msw_directory[require_msw_name] = directory_name;
+    msw_directory[mission_name] = directory_name;
 
     if (require_msw_name == 'msw_webrtc') {
-        try {
-            webrtc_conf = JSON.parse(fs.readFileSync('webrtc_conf.json', 'utf8'));
-        } catch (e) {
-            webrtc_conf.gcs = drone_info.gcs;
-            webrtc_conf.drone = drone_info.drone;
-            webrtc_conf.directory_name = directory_name;
-            webrtc_conf.host = drone_info.host;
-            fs.writeFileSync('webrtc_conf.json', JSON.stringify(webrtc_conf, null, 4), 'utf8');
-        }
+        webrtc_conf.gcs = drone_info.gcs;
+        webrtc_conf.drone = drone_info.drone;
+        webrtc_conf.directory_name = directory_name;
+        webrtc_conf.host = drone_info.host;
+        fs.writeFileSync('webrtc_conf.json', JSON.stringify(webrtc_conf, null, 4), 'utf8');
+
         // pm2 start msw_webrtc_msw_webrtc/msw_webrtc
         setTimeout(run_webrtc, 10, mission_name, directory_name);
 
@@ -437,6 +434,26 @@ function retrieve_my_cnt_name(callback) {
         if (rsc == 2000) {
             drone_info = res_body[Object.keys(res_body)[0]].con;
             console.log(drone_info);
+
+            if (drone_info.hasOwnProperty('update')) {
+                if (drone_info.update === 'enable') {
+                    const shell = require('shelljs')
+
+                    if(shell.exec('git reset --hard HEAD').code !== 0) {
+                        shell.echo('Error: command failed')
+                        shell.exit(1)
+                    }
+                    else {
+                        if(shell.exec('git pull').code !== 0) {
+                            shell.echo('Error: command failed')
+                            shell.exit(1)
+                        }
+                        else {
+                            console.log('Finish update !');
+                        }
+                    }
+                }
+            }
 
             conf.sub = [];
             conf.cnt = [];
@@ -823,7 +840,7 @@ function mqtt_connect(serverip, sub_gcs_topic, noti_topic) {
         });
 
         mqtt_client.on('error', function (err) {
-            console.log(err.message);
+            console.log('[mqtt_client error] ' + err.message);
         });
     }
 }
@@ -878,9 +895,20 @@ function muv_mqtt_connect(broker_ip, port, noti_topic) {
 
         muv_mqtt_client.on('message', function (topic, message) {
             try {
-                var msg_obj = JSON.parse(message.toString());
-                send_to_Mobius((topic), msg_obj, parseInt(Math.random() * 10));
-                //console.log(topic + ' - ' + JSON.stringify(msg_obj));
+                if (topic.includes('msw_lte_rc_4')){
+                    if (mavPort != null) {
+                        if (mavPort.isOpen) {
+                            console.log(message);
+                            mavPort.write(message);
+                        } else {
+                            console.log('mavPort is not opened');
+                        }
+                    }
+                } else {
+                    var msg_obj = JSON.parse(message.toString());
+                    send_to_Mobius((topic), msg_obj, parseInt(Math.random() * 10));
+                    //console.log(topic + ' - ' + JSON.stringify(msg_obj));
+                }
             } catch (e) {
                 msg_obj = message.toString();
                 send_to_Mobius((topic), msg_obj, parseInt(Math.random() * 10));
@@ -889,7 +917,7 @@ function muv_mqtt_connect(broker_ip, port, noti_topic) {
         });
 
         muv_mqtt_client.on('error', function (err) {
-            console.log(err.message);
+            console.log('[muv_mqtt_client error] ' + err.message);
         });
     }
 }
