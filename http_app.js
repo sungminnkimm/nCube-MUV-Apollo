@@ -436,7 +436,7 @@ function retrieve_my_cnt_name(callback) {
     sh_adn.rtvct('/Mobius/' + conf.ae.approval_gcs + '/approval/' + conf.ae.name + '/la', 0, function (rsc, res_body, count) {
         if (rsc == 2000) {
             drone_info = res_body[Object.keys(res_body)[0]].con;
-            //console.log(drone_info);
+            console.log(drone_info);
 
             conf.sub = [];
             conf.cnt = [];
